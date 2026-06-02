@@ -1,0 +1,24 @@
+# Arquivos de credenciais do Google Drive (NUNCA SUBIR)
+credentials.json
+token.pickle
+
+# Arquivos de estado e downloads do script
+processed.json
+Downloads_Drive/
+
+# Ambiente Virtual do Python
+venv/
+env/
+ENV/
+
+# Python Cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Configurações de IDEs
+.vscode/
+.idea/
+*.swp
+*.log
