@@ -35,3 +35,8 @@ Fechamento semana 11 a 18.xlsx
 # Pastas de mídia geradas pelo Manim
 media/
 */media/
+
+# Credenciais da API do Google (Agente 2)
+agente 2/credentials.json
+agente 2/token.json
+agente 2/__pycache__/
