@@ -7,88 +7,111 @@ from drive_service import DriveService
 sys.stdout.reconfigure(encoding='utf-8')
 
 # --- CONFIGURAÇÕES A SEREM PREENCHIDAS PELO USUÁRIO ANTES DE RODAR ---
-SOURCE_DRIVE_FOLDER_ID = "1CCAfj2zR02OVB6ZK8aKDSswSWWgN9d0Z" 
+SOURCE_DRIVE_FOLDER_ID = "1PF6v9AlWKlMHaTChaL2qUJnL2Yil9AMR" # COLOQUE AQUI O ID DA PASTA DO CURSO NO DRIVE
 DESTINATION_DRIVE_FOLDER_ID = "1_vDYOk1VpGz6b2KgjeQrQUaHwmKtYmbX" # Pode deixar vazio se for criar tudo na raiz do seu Drive atual, ou colocar o ID de uma pasta vazia
 
-# Coloque aqui o nome exato das pastas de cursos que quer processar. Ex: ["Biomedicina", "FARM Atual -Nylza"]
-# Se deixar vazio [], ele vai varrer a universidade inteira (o que pode levar horas).
-CURSOS_PERMITIDOS = ["Administração"]
+# Coloque abaixo o nome do curso que deseja que seja o nome da pasta principal gerada.
+# Ex: "Administração", "Biomedicina", etc.
+NOME_DO_CURSO_FONTE = "CST Gestão em Tecnologia da Informação"
 # ----------------------------------------------------------------------
 
-def extract_metadata(logical_path, file_name):
+def extract_metadata(logical_path, file_name, file_id=None, drive_service=None, course_name=None):
     """
-    Exemplo de logical_path:
-    "Biomedicina/Planos de Ensino/SEMIPRESENCIAL/1º PERÍODO/Plano de ensino - Bioestatística.pdf"
-    "Biomedicina/Controle de UA/EAD/Controle de UA - Matemática 2025.2.pdf"
+    Extrai metadados do arquivo baseando-se no caminho e no nome do arquivo.
+    Funciona tanto com estruturas rígidas (Curso/Categoria/Modalidade/Período) 
+    quanto estruturas mais livres (apenas a pasta do período e nome do arquivo).
     """
+    if not file_name.lower().endswith('.pdf'):
+        return None
+
     parts = logical_path.split('/')
-    if len(parts) < 3:
-        return None  # Não tem a profundidade esperada
-        
-    curso = parts[0]
-    categoria = parts[1] # "Planos de Ensino", "Controle de UA", etc
     
-    # Ignorar lixo ou pastas que não sejam de Planos ou UA
-    if "plano" not in categoria.lower() and "ua" not in categoria.lower():
-        return None
+    # 1. Definir o Curso
+    if course_name:
+        curso = course_name
+    else:
+        if len(parts) < 2:
+            return None
+        curso = parts[0]
+        
+    # 2. Definir a Categoria (Plano de Ensino ou Controle de UA)
+    full_path_str = logical_path + "/" + file_name
+    
+    is_plano = re.search(r"(?i)(plano de ensino|pe_|\bpe\b|pl\s*ens|plan\s*ens)", full_path_str)
+    is_ua = re.search(r"(?i)(controle de ua|ua_|\bua\b)", full_path_str)
+    
+    if is_ua:
+        categoria = "Controle de UA"
+    elif is_plano:
+        categoria = "Planos de Ensino"
+    else:
+        # Se não tiver a tag explícita, como todos os uploads agora são apenas PDF das disciplinas,
+        # assumimos por padrão que seja Plano de Ensino em vez de descartar.
+        categoria = "Planos de Ensino"
 
-    # Filtrar rigidamente pelo nome do arquivo: SÓ aceita se o NOME tiver Plano de Ensino ou Controle de UA
-    if not re.search(r"(?i)(plano de ensino|controle de ua)", file_name):
-        return None
-
-    # Tentar encontrar a modalidade (EAD, SEMIPRESENCIAL, etc)
+    # 3. Extrair Modalidade
     modalidade = "GERAL"
-    for part in parts[2:]:
-        if part.upper() in ["EAD", "SEMIPRESENCIAL", "PRESENCIAL", "FLEX", "HIBRIDO"]:
-            modalidade = part.upper()
+    for part in parts + [file_name]:
+        for mod in ["EAD", "SEMIPRESENCIAL", "PRESENCIAL", "FLEX", "HIBRIDO"]:
+            if re.search(fr"(?i)\b{mod}\b", part):
+                modalidade = mod.upper()
+                break
+        if modalidade != "GERAL":
             break
             
-    # Extrair Período (Ex: "1º Período", "2ºP", "3° P")
+    # 4. Extrair Período
     periodo = "PERÍODO INDEFINIDO"
-    for part in parts:
-        match_periodo = re.search(r"(?i)(\d+)\s*[º°a-z]*\s*(período|p\b|entrada)", part)
+    for part in parts + [file_name]:
+        match_periodo = re.search(r"(?i)(\d+)\s*[º°a-z]*\s*(per\S*odo|p\b|entrada)", part)
         if match_periodo:
             periodo = f"{match_periodo.group(1)}º Período"
             break
 
-    # Extrair Disciplina do nome do arquivo
-    # Remove extensão
+    # 5. Extrair Disciplina do nome do arquivo
     name_no_ext = os.path.splitext(file_name)[0]
     
-    # Limpeza básica do nome
-    # Ex: "Plano de ensino - Anatomia sistêmica (1)" -> "Anatomia sistêmica"
-    # Ex: "Controle de UA_Matemática_2026.1" -> "Matemática"
-    
-    # Remover prefixos comuns
-    clean_name = re.sub(r"(?i)^(Plano de ensino|Controle de UA)\s*[-_–]?\s*", "", name_no_ext)
-    
-    # Remover (1), (2), etc
+    # Remover prefixos comuns do nome
+    clean_name = name_no_ext
+    clean_name = re.sub(r"(?i)^(\(\d{4}\.\d\)\s*)?(Plano de ensino|Controle de UA|PE|Pl\s*Ens|Plan\s*Ens)\s*[-_–]?\s*", "", clean_name)
     clean_name = re.sub(r"\(\d+\)", "", clean_name)
     
-    # Se quiser pegar só a disciplina e ignorar 2026.1 no nome para poder agrupar:
-    # A disciplina será o clean_name, mas vamos guardar a string inteira para comparar depois e pegar a mais nova
     disciplina = clean_name.strip()
     
-    # Vamos considerar que o que sobrou é a disciplina (ela pode conter " 2025.2" no fim)
-    # Retornamos os dados extraídos
     return {
         "curso": curso,
         "categoria": categoria,
         "modalidade": modalidade,
         "periodo": periodo,
         "disciplina_bruta": disciplina,
-        "ano_semestre": extract_year_semester(file_name + logical_path),
+        "ano_semestre": extract_year_semester(file_name + logical_path, file_id, drive_service, file_name),
         "file_name": file_name
     }
 
-def extract_year_semester(text):
-    """Procura por 2025.1, 2026.1, 2026.2 etc no texto e retorna como float para facilitar comparação (2026.1 > 2025.2)"""
+def extract_year_semester(text, file_id=None, drive_service=None, file_name=""):
+    """Procura por 2025.1, 2026.1, 2026.2 etc no texto. Lê PDF se necessário."""
     match = re.search(r"20\d{2}\.[1-2]", text)
     if match:
         return float(match.group())
+        
+    if file_id and drive_service and file_name.lower().endswith('.pdf'):
+        try:
+            print(f"Lendo conteúdo interno do PDF: {file_name} para buscar data...")
+            pdf_bytes = drive_service.download_file_to_memory(file_id)
+            if pdf_bytes:
+                import PyPDF2
+                reader = PyPDF2.PdfReader(pdf_bytes)
+                for i in range(min(3, len(reader.pages))):
+                    page_text = reader.pages[i].extract_text()
+                    if page_text:
+                        match_pdf = re.search(r"20\d{2}\.[1-2]", page_text)
+                        if match_pdf:
+                            return float(match_pdf.group())
+        except Exception as e:
+            pass
+            
     return 0.0
 
-def process_directory(source_id, dest_id, drive_service, allowed_courses=None, dry_run=True):
+def process_directory(source_id, dest_id, drive_service, allowed_courses=None, dry_run=True, course_name=None):
     print(f"Lendo arquivos da pasta de origem (ID: {source_id})... Isso pode levar um tempo.")
     
     # Dicionário para agrupar: chave = (curso, disciplina_limpa, modalidade, categoria)
@@ -100,7 +123,7 @@ def process_directory(source_id, dest_id, drive_service, allowed_courses=None, d
         file_name = file_info['name']
         logical_path = file_info['path']
         
-        meta = extract_metadata(logical_path, file_name)
+        meta = extract_metadata(logical_path, file_name, file_id, drive_service, course_name)
         if meta:
             # Para agrupar as disciplinas mesmo se uma for "Matemática 2025.2" e a outra "Matemática 2026.1"
             # Precisamos limpar o ano do nome da disciplina para ser a mesma chave
@@ -126,46 +149,44 @@ def process_directory(source_id, dest_id, drive_service, allowed_courses=None, d
         # Ordenar os arquivos dessa disciplina/categoria do mais novo para o mais velho (maior ano/semestre primeiro)
         files_list.sort(key=lambda x: x["ano_semestre"], reverse=True)
         
-        for index, file_data in enumerate(files_list):
-            curso = file_data["curso"]
-            periodo = key[1]
-            disciplina = key[2] # A disciplina sem o ano
-            modalidade = file_data["modalidade"]
-            file_name = file_data["file_name"]
-            file_id = file_data["id"]
+        # Pega apenas o MAIS RECENTE (index 0), ignorando totalmente os velhos
+        file_data = files_list[0]
+        
+        curso = file_data["curso"]
+        periodo = key[1]
+        disciplina = key[2] # A disciplina sem o ano
+        modalidade = file_data["modalidade"]
+        file_name = file_data["file_name"]
+        file_id = file_data["id"]
+        
+        path_list = [curso, periodo]
             
-            # O arquivo mais recente (index 0) vai para a pasta raiz da Modalidade
-            if index == 0:
-                path_list = [curso, periodo, disciplina, modalidade]
-                status = "ATUAL"
-            # Os desatualizados vão para a subpasta "Arquivos Antigos"
-            else:
-                path_list = [curso, periodo, disciplina, modalidade, "Arquivos Antigos"]
-                status = "ANTIGO"
+        status = "ATUAL"
+        
+        print(f"[{status}] {file_name}")
+        print(f"   -> {' > '.join(path_list)} > {file_name}")
             
-            print(f"[{status}] {file_name}")
-            print(f"   -> {' > '.join(path_list)} > {file_name}")
-            
-            if not dry_run:
-                # Cria/Pega ID da pasta final
-                final_folder_id = drive_service.create_path(path_list, dest_id)
-                # Faz a cópia
-                drive_service.copy_file(file_id, file_name, final_folder_id)
+        if not dry_run:
+            # Cria/Pega ID da pasta final
+            final_folder_id = drive_service.create_path(path_list, dest_id)
+            # Faz a cópia
+            drive_service.copy_file(file_id, file_name, final_folder_id)
 
 if __name__ == '__main__':
     print("=== Automação de Google Drive API ===")
     
-    if SOURCE_DRIVE_FOLDER_ID == "COLOQUE_AQUI_O_ID_DA_PASTA_RAIZ_DE_ORIGEM":
+    if not SOURCE_DRIVE_FOLDER_ID or SOURCE_DRIVE_FOLDER_ID == "COLOQUE_AQUI_O_ID_DA_PASTA_RAIZ_DE_ORIGEM":
         print("AVISO: Você precisa colocar o ID da pasta de origem em SOURCE_DRIVE_FOLDER_ID no main.py!")
     else:
         try:
             drive_srv = DriveService()
             # Se DESTINATION_DRIVE_FOLDER_ID estiver vazio, as pastas (Cursos) serão criadas na "Meu Drive"
             root_dest = DESTINATION_DRIVE_FOLDER_ID if DESTINATION_DRIVE_FOLDER_ID else None
+                
+            print(f"Iniciando leitura para a pasta do curso: {NOME_DO_CURSO_FONTE}")
             
             # Altere dry_run para False para fazer a execução real!
-            allowed = CURSOS_PERMITIDOS if CURSOS_PERMITIDOS else None
-            process_directory(SOURCE_DRIVE_FOLDER_ID, root_dest, drive_srv, allowed_courses=allowed, dry_run=False)
+            process_directory(SOURCE_DRIVE_FOLDER_ID, root_dest, drive_srv, allowed_courses=None, dry_run=False, course_name=NOME_DO_CURSO_FONTE)
             
         except Exception as e:
             print(f"Erro: {e}")

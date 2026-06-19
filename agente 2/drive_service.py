@@ -1,9 +1,11 @@
 import os
 import time
+import io
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
+from googleapiclient.http import MediaIoBaseDownload
 
 # Escopos básicos para ler/gravar no Drive
 SCOPES = ['https://www.googleapis.com/auth/drive']
@@ -151,3 +153,27 @@ class DriveService:
             page_token = response.get('nextPageToken', None)
             if page_token is None:
                 break
+
+    def download_file_to_memory(self, file_id):
+        """Baixa o arquivo para a memória e retorna os bytes."""
+        try:
+            request = self.service.files().get_media(fileId=file_id)
+            fh = io.BytesIO()
+            downloader = MediaIoBaseDownload(fh, request)
+            done = False
+            while done is False:
+                status, done = downloader.next_chunk()
+            fh.seek(0)
+            return fh
+        except Exception as e:
+            print(f"Erro ao baixar arquivo {file_id}: {e}")
+            return None
+
+    def get_folder_name(self, folder_id):
+        """Obtém o nome de uma pasta ou arquivo pelo ID."""
+        try:
+            folder = self.service.files().get(fileId=folder_id, fields='name', supportsAllDrives=True).execute()
+            return folder.get('name')
+        except Exception as e:
+            print(f"Erro ao obter nome da pasta {folder_id}: {e}")
+            return None
