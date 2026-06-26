@@ -7,12 +7,12 @@ from drive_service import DriveService
 sys.stdout.reconfigure(encoding='utf-8')
 
 # --- CONFIGURAÇÕES A SEREM PREENCHIDAS PELO USUÁRIO ANTES DE RODAR ---
-SOURCE_DRIVE_FOLDER_ID = "1PF6v9AlWKlMHaTChaL2qUJnL2Yil9AMR" # COLOQUE AQUI O ID DA PASTA DO CURSO NO DRIVE
+SOURCE_DRIVE_FOLDER_ID = "11hp1d8NrUdWkQqnl31-AK9s7kROy-GL9" # COLOQUE AQUI O ID DA PASTA DO CURSO NO DRIVE
 DESTINATION_DRIVE_FOLDER_ID = "1_vDYOk1VpGz6b2KgjeQrQUaHwmKtYmbX" # Pode deixar vazio se for criar tudo na raiz do seu Drive atual, ou colocar o ID de uma pasta vazia
 
 # Coloque abaixo o nome do curso que deseja que seja o nome da pasta principal gerada.
 # Ex: "Administração", "Biomedicina", etc.
-NOME_DO_CURSO_FONTE = "CST Gestão em Tecnologia da Informação"
+NOME_DO_CURSO_FONTE = "Serviço Social"
 # ----------------------------------------------------------------------
 
 def extract_metadata(logical_path, file_name, file_id=None, drive_service=None, course_name=None):
@@ -21,7 +21,7 @@ def extract_metadata(logical_path, file_name, file_id=None, drive_service=None, 
     Funciona tanto com estruturas rígidas (Curso/Categoria/Modalidade/Período) 
     quanto estruturas mais livres (apenas a pasta do período e nome do arquivo).
     """
-    if not file_name.lower().endswith('.pdf'):
+    if not (file_name.lower().endswith('.pdf') or file_name.lower().endswith('.docx') or file_name.lower().endswith('.doc')):
         return None
 
     parts = logical_path.split('/')
@@ -111,7 +111,7 @@ def extract_year_semester(text, file_id=None, drive_service=None, file_name=""):
             
     return 0.0
 
-def process_directory(source_id, dest_id, drive_service, allowed_courses=None, dry_run=True, course_name=None):
+def process_directory(source_id, dest_id, drive_service, allowed_courses=None, dry_run=True, course_name=None, return_data=False):
     print(f"Lendo arquivos da pasta de origem (ID: {source_id})... Isso pode levar um tempo.")
     
     # Dicionário para agrupar: chave = (curso, disciplina_limpa, modalidade, categoria)
@@ -138,7 +138,26 @@ def process_directory(source_id, dest_id, drive_service, allowed_courses=None, d
                 
     if not grouped_files:
         print("Nenhum arquivo válido encontrado para processamento.")
+        if return_data: return []
         return
+        
+    if return_data:
+        results = []
+        for key, files_list in grouped_files.items():
+            files_list.sort(key=lambda x: x["ano_semestre"], reverse=True)
+            file_data = files_list[0]
+            results.append({
+                "file_name": file_data["file_name"],
+                "curso": file_data["curso"],
+                "periodo": key[1],
+                "disciplina": key[2],
+                "modalidade": file_data["modalidade"],
+                "categoria": file_data["categoria"],
+                "ano_semestre": file_data["ano_semestre"],
+                "id": file_data["id"],
+                "path_list": [file_data["curso"], key[1]]
+            })
+        return results
 
     print(f"\nIniciando organização dos arquivos...")
     

@@ -127,7 +127,7 @@ class DriveService:
                     ).execute()
                     break
                 except Exception as e:
-                    print(f"Aviso: Erro de conexão, tentando novamente ({attempt+1}/5)...")
+                    print(f"Aviso: Erro de conexão, tentando novamente ({attempt+1}/5)... Detalhe: {e}")
                     time.sleep(2)
             else:
                 print(f"Erro fatal: Não foi possível ler a pasta {folder_id} após 5 tentativas.")
@@ -153,6 +153,35 @@ class DriveService:
             page_token = response.get('nextPageToken', None)
             if page_token is None:
                 break
+
+    def list_directory(self, folder_id='root'):
+        """
+        Retorna os arquivos e subpastas diretos de uma pasta (sem recursividade).
+        """
+        query = f"'{folder_id}' in parents and trashed=false"
+        try:
+            response = self.service.files().list(
+                q=query,
+                spaces='drive',
+                fields='files(id, name, mimeType)',
+                supportsAllDrives=True,
+                includeItemsFromAllDrives=True,
+                orderBy='folder, name'
+            ).execute()
+            
+            items = []
+            for file in response.get('files', []):
+                items.append({
+                    'id': file.get('id'),
+                    'name': file.get('name'),
+                    'is_folder': file.get('mimeType') == 'application/vnd.google-apps.folder',
+                    'mimeType': file.get('mimeType')
+                })
+            
+            return items
+        except Exception as e:
+            print(f"Erro ao listar diretório {folder_id}: {e}")
+            raise e
 
     def download_file_to_memory(self, file_id):
         """Baixa o arquivo para a memória e retorna os bytes."""
