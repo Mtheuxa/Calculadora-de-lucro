@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Drive Automação</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Automação Drive</h1>
+            <p class="subtitle">Navegue até a pasta do curso e processe os arquivos.</p>
+        </header>
+
+        <main>
+            <!-- File Explorer Section -->
+            <section class="card explorer-section" id="explorer-section">
+                <div class="explorer-header">
+                    <div class="breadcrumb" id="breadcrumb">
+                        <!-- Preenchido via JS -->
+                    </div>
+                    <button id="btn-process-current" class="btn btn-primary btn-icon" title="Analisar pasta selecionada">
+                        <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                        Analisar Pasta Atual
+                    </button>
+                </div>
+                
+                <div class="file-grid" id="file-grid">
+                    <div class="grid-loading">Carregando pastas...</div>
+                </div>
+            </section>
+
+            <!-- Results Section (Hidden initially) -->
+            <section class="card results-section" id="results-container" style="display: none;">
+                <div class="results-header">
+                    <h2>Pré-visualização</h2>
+                    <span id="results-count" class="badge">0 arquivos</span>
+                </div>
+                
+                <div class="form-row mb-4">
+                    <div class="form-group">
+                        <label for="course-name">Nome do Curso (Opcional)</label>
+                        <input type="text" id="course-name" placeholder="Ex: Serviço Social">
+                    </div>
+                    <div class="form-group">
+                        <label for="dest-id">ID Destino (Opcional - Vazio salva na raiz)</label>
+                        <input type="text" id="dest-id" placeholder="Deixe em branco para raiz">
+                    </div>
+                </div>
+
+                <div class="table-container mb-4">
+                    <table id="results-table">
+                        <thead>
+                            <tr>
+                                <th>Arquivo</th>
+                                <th>Caminho Final</th>
+                                <th>Categoria</th>
+                                <th>Ano/Semestre</th>
+                            </tr>
+                        </thead>
+                        <tbody id="results-body">
+                            <!-- JS vai popular isso -->
+                        </tbody>
+                    </table>
+                </div>
+                
+                <div class="actions">
+                    <button id="btn-cancel" class="btn btn-secondary">Voltar p/ Navegador</button>
+                    <button id="btn-run" class="btn btn-primary">Iniciar Organização e Cópia</button>
+                </div>
+            </section>
+            
+            <div id="toast" class="toast">Mensagem de aviso</div>
+            
+            <div id="loading" class="loading-overlay" style="display: none;">
+                <div class="spinner"></div>
+                <p>Processando, aguarde...</p>
+            </div>
+        </main>
+    </div>
+    
+    <script src="main.js"></script>
+</body>
+</html>

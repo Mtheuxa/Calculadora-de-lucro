@@ -3,8 +3,12 @@ from flask_cors import CORS
 from main import process_directory
 from drive_service import DriveService
 
-app = Flask(__name__)
+app = Flask(__name__, static_folder='Frontend', static_url_path='')
 CORS(app)
+
+@app.route('/')
+def index():
+    return app.send_static_file('index.html')
 
 @app.route('/api/drive', defaults={'folder_id': 'root'}, methods=['GET'])
 @app.route('/api/drive/<folder_id>', methods=['GET'])
